@@ -4,6 +4,9 @@ This repository contains the source code and the resources for workshop from Spr
 
 https://2019.springio.net/sessions/cloud-native-reactive-spring-boot-application-development-workshop
 
+## 01-initial step
+
+At this step installation of pre-requisites are expected. Please follow the Prerequisites.
 
 ## Prerequisites
 In order to follow the workshop, it's good idea to have the following prerequisites ready on your system

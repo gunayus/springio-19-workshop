@@ -18,6 +18,8 @@ In order to follow the workshop, it's good idea to have the following prerequisi
 + Redis
 + Kafka
 
+If you have all the prerequisites available you can skip this part and proceed to checkout 02_reactive_spring branch 
+
 ### Installing Lombok
 Lombok can be installed as a plug-in to your favourite IDE. Follow the instructions for your IDE
 TODO - add lombok link here

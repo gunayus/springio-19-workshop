@@ -4,71 +4,76 @@ This repository contains the source code and the resources for workshop from Spr
 
 https://2019.springio.net/sessions/cloud-native-reactive-spring-boot-application-development-workshop
 
-## 01-initial step
+## 02-reactive_spring step
 
-At this step installation of pre-requisites are expected. Please follow the Prerequisites.
+At this step, you are expected to convert a regular servlet based REST controller to a reactive REST controller. Please follow the instructions.
 
-## Prerequisites
-In order to follow the workshop, it's good idea to have the following prerequisites ready on your system
-    
+### non-reactive REST controller (List<Greeting>)
+In the project, you will see the module 'live-score-service' which is created for you and contains a sample ApiRestController.java class for returning 10 greeting messages in a list. 
+please pay attention to pom.xml and see that it's derived from the parent 'spring-boot-starter-parent' and contains the dependency 'spring-boot-starter-web'
 
-+ JDK 8 or above
-+ IDE supporting Spring development, e.g. STS, Eclipse, Intellij IDEA, etc.
-+ Redis
-+ Kafka
-
-### Installing Redis
-Redis can be installed in two ways
-
-1 - Build from source code
-
-https://redis.io/topics/quickstart
-
-As explained in Redis quick start installation section, Redis can be built from source code and installed. 
 
 ```
-wget http://download.redis.io/redis-stable.tar.gz 
-tar xvzf redis-stable.tar.gz
-cd redis-stable
-make
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>2.1.5.RELEASE</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
 ```
 
-2 - Use docker image
-
-Follow instructions listed in Redis official dockerhub page
-
-https://hub.docker.com/_/redis
-
-or you can use following docker-compose.yml content
+Run LiveScoreServiceApplication.java either as Java Class or by maven
 
 ```
-version: '2'
-
-services:
-  redis:
-    image: 'bitnami/redis:latest'
-    environment:
-      # ALLOW_EMPTY_PASSWORD is recommended only for development.
-      - ALLOW_EMPTY_PASSWORD=yes
-    labels:
-      kompose.service.type: nodeport
-    ports:
-      - '6379:6379'
-    volumes:
-      - ~/volumes/redis:/var/lib/redis
-    command: redis-server --requirepass password
+mvn spring-boot:run
 ```
 
-
-### Installing Kafka
-Download latest kafka release as explained in 
-
-https://kafka.apache.org/quickstart
+You should notice that the application is started in Tomcat. 
 
 ```
-> tar -xzf kafka_2.12-2.2.0.tgz
-> cd kafka_2.12-2.2.0
-> bin/zookeeper-server-start.sh config/zookeeper.properties
-> bin/kafka-server-start.sh config/server.properties
+2019-05-19 14:47:27.384  INFO 2961 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+2019-05-19 14:47:27.469  INFO 2961 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2019-05-19 14:47:27.469  INFO 2961 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.19]
+2019-05-19 14:47:27.814  INFO 2961 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2019-05-19 14:47:27.815  INFO 2961 --- [  restartedMain] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 2655 ms
+2019-05-19 14:47:28.677  INFO 2961 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+2019-05-19 14:47:29.275  INFO 2961 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2019-05-19 14:47:29.296  INFO 2961 --- [  restartedMain] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2019-05-19 14:47:29.704  INFO 2961 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
 ```
 
+Call the greetings service
+```
+curl -X GET http://localhost:8080/greetings
+```
+
+You should see 10 simple greeting messages as JSON data. 
+
+
+### convert to Reactive REST controller (Flux<Greeting>)
+Now it's time to convert the given RestController to reactive. 
+
+In order to do so, first thing that needs to be done is to change the spring boot web starter to webflux starter so that we have the reactive stack available.

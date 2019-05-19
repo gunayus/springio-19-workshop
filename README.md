@@ -72,3 +72,6 @@ https://kafka.apache.org/quickstart
 > bin/kafka-server-start.sh config/server.properties
 ```
 
+## next section is reactive Spring development 
+
+checkout 02_reactive_spring branch and follow the instructions in README.md

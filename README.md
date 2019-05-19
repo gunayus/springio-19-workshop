@@ -14,8 +14,14 @@ In order to follow the workshop, it's good idea to have the following prerequisi
 
 + JDK 8 or above
 + IDE supporting Spring development, e.g. STS, Eclipse, Intellij IDEA, etc.
++ lombok
 + Redis
 + Kafka
+
+### Installing Lombok
+Lombok can be installed as a plug-in to your favourite IDE. Follow the instructions for your IDE
+TODO - add lombok link here
+
 
 ### Installing Redis
 Redis can be installed in two ways

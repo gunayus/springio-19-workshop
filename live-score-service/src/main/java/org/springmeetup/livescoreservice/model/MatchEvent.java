@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MatchEvent {
-
-	private Integer minute;
-
+	private int minute;
+	private String type;
+	private String team;
+	private String playerName;
 }

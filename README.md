@@ -23,8 +23,27 @@ in order to fetch data from Redis in a reactive manner, following dependency is 
 
 once we have the maven dependency we have all the required classes. we need Redis configuration beans for following
 
-+ 
++ ReactiveRedisConnectionFactory bean
++ ReactiveRedisTemplate bean
 
+in the base project, RedisConfig.java is provided. add the following Bean method so that it can be used to perform Redis operations
+
+```
+	@Bean
+	public ReactiveRedisTemplate<String, Match> matchReactiveRedisTemplate(ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
+		RedisSerializationContext<String, Match> serializationContext = RedisSerializationContext
+				.<String, Match>newSerializationContext(new StringRedisSerializer())
+				.hashKey(new StringRedisSerializer())
+				.hashValue(configureJackson2JsonRedisSerializer(Match.class))
+				.build();
+
+		return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, serializationContext);
+	}
+```
+
+for creating a ReactiveRedisTemplate bean, you need a connection factory and a serialization context object. Seralization context is created with a hashKey and hashValue seralizer
+
+### Redis  
 
 
 In the next section, we will fetch events from Kafka in a reactive manner

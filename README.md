@@ -240,6 +240,195 @@ to be equal to:
 but was not.
 ```
 
+### create RestController class
+now, it's finally time to write some code that will run on production :)
+
+in order to make the contract test pass, you need to implement RestController according to the contract. try to implement first yourself, if needed you can use following implementation
+
+```
+	@GetMapping("/match/{id}")
+	public Mono<Match> getMatchById(@PathVariable("id") Long id) {
+		return Mono.just(Match.builder()
+				.matchId(id)
+				.name("Fenerbahçe - Galatasaray")
+				.status("NOT_STARTED")
+				.startDate(LocalDateTime.of(2019, 5, 16, 19, 0, 0))
+				.build());
+	}
+```
+
+when re-executed, test should fail with following error. this is because the field names in the JSON response do not match the field names in the contract. 
+
+notice 'start-date', 'match-id'. 
+
+```
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 36.421 s <<< FAILURE! - in org.springmeetup.livescoreservice.ApiTest
+[ERROR] validate_get_match_by_id_1(org.springmeetup.livescoreservice.ApiTest)  Time elapsed: 2.43 s  <<< ERROR!
+java.lang.IllegalStateException: Parsed JSON [{"matchId":1,"name":"Fenerbah?e - Galatasaray","startDate":"2019-05-16T19:00:00","status":"NOT_STARTED"}] doesn't match the JSON path [$[?(@.['start-date'] == '2019-05-16T19:00:00')]]
+        at org.springmeetup.livescoreservice.ApiTest.validate_get_match_by_id_1(ApiTest.java:38)
+
+```
+
+by default Spring JSON serialization uses camel case naming convention, but we should change it to kebab case. in order to do so, add following line in application.properties
+
+```
+spring.jackson.property-naming-strategy=KEBAB_CASE
+```
+
+now the test should be successful
+
+```
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+```
+ 
+### create the 2nd contract 
+
+in order to improve business requirements (data model, implementation, etc.), let's add a second contract 
+
+src/test/resources/contracts/api/get-match-by-id-2.groovy
+
+
+```
+package contracts.api
+
+import org.springframework.cloud.contract.spec.Contract
+
+Contract.make {
+	description("Returns the details of match by id : 2")
+
+	request {
+		method GET()
+		url "/match/2"
+		headers {
+			contentType applicationJson()
+		}
+	}
+
+	response {
+		status OK()
+		headers {
+			contentType applicationJson()
+		}
+		body("""
+			{
+				"match-id": 2,
+				"name": "Barcelona - Real Madrid",
+				"start-date": "2019-05-01T19:00:00",
+				"status": "COMPLETED",
+				"score": "1 - 1",
+				"events": [
+					{
+						"minute": 1, 
+						"type": "GOAL",
+						"team": "Barcelona",
+						"player-name": "Lionel Messi"
+					},
+					{
+						"minute": 45, 
+						"type": "RED",
+						"team": "Real Madrid",						
+						"player-name": "Sergio Ramos"
+					},
+					{
+						"minute": 75, 
+						"type": "GOAL",
+						"team": "Real Madrid",						
+						"player-name": "Luka Modric"
+					}
+				]
+			}
+		"""
+		)
+	}
+}
+```
+
+this will create a second test method in ApiTest.java class. when the test is run following should print
+
+```
+[ERROR] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 31.257 s <<< FAILURE! - in org.springmeetup.livescoreservice.ApiTest
+[ERROR] validate_get_match_by_id_2(org.springmeetup.livescoreservice.ApiTest)  Time elapsed: 0.135 s  <<< ERROR!
+java.lang.RuntimeException: com.jayway.jsonpath.PathNotFoundException: Missing property in path $['events']
+        at org.springmeetup.livescoreservice.ApiTest.validate_get_match_by_id_2(ApiTest.java:58)
+Caused by: com.jayway.jsonpath.PathNotFoundException: Missing property in path $['events']
+        at org.springmeetup.livescoreservice.ApiTest.validate_get_match_by_id_2(ApiTest.java:58)
+```
+
+this is because our ApiRestController.java implementation can not return the expected JSON response for the second contract. This is where we should use ApiBase.java test class. this is an extension point for mocking the behaviour of related Spring Beans 
+
+change the ApiRestController.java class to delegate the operation to the ApiRestService.java 
+
+```
+@Service
+@RequiredArgsConstructor
+public class ApiRestService {
+
+	public Mono<Match> getMatchById(@PathVariable("id") Long id) {
+		return null;
+	}
+
+}
+```
+
+```
+@RestController
+@RequiredArgsConstructor
+public class ApiRestController {
+
+	private final ApiRestService apiRestService;
+
+	@GetMapping("/match/{id}")
+	public Mono<Match> getMatchById(@PathVariable("id") Long id) {
+		return apiRestService.getMatchById(id);
+	}
+}
+```
+
+and add mock data to ApiBase.java test class
+
+```
+		Mockito.when(apiRestService.findMatchById(1l)).thenReturn(
+				Mono.just(Match.builder()
+						.matchId(1l)
+						.name("Fenerbahçe - Galatasaray")
+						.startDate(LocalDateTime.of(2019, 5, 16, 19, 0))
+						.status("NOT_STARTED")
+						.build()
+				));
+
+		Mockito.when(apiRestService.findMatchById(2l)).thenReturn(
+				Mono.just(Match.builder()
+						.matchId(2l)
+						.name("Barcelona - Real Madrid")
+						.startDate(LocalDateTime.of(2019, 5, 1, 19, 0))
+						.status("COMPLETED")
+						.score("1 - 1")
+						.events(Arrays.asList(
+								MatchEvent.builder().minute(1).type("GOAL").team("Barcelona").playerName("Lionel Messi").build(),
+								MatchEvent.builder().minute(45).type("RED").team("Real Madrid").playerName("Sergio Ramos").build(),
+								MatchEvent.builder().minute(75).type("GOAL").team("Real Madrid").playerName("Luka Modric").build()
+						))
+						.build()
+				));
+```
+
+both of the tests should be ok now 
+
+```
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+```
+
+at the end of this section, we have a contract driven Reactive Rest service which does not really fetch the data from a data store but just returns NULL for each request. 
+
+In the next section, we will fetch data from Redis in a reactive manner
  
 ## next section is reactive-redis operations
 

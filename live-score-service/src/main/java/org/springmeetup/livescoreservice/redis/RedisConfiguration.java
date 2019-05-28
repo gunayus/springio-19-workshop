@@ -32,6 +32,17 @@ public class RedisConfiguration {
 		return new LettuceConnectionFactory(redisConfiguration);
 	}
 
+	@Bean
+	public ReactiveRedisTemplate<String, Match> matchReactiveRedisTemplate(ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
+		RedisSerializationContext<String, Match> serializationContext = RedisSerializationContext
+				.<String, Match>newSerializationContext(new StringRedisSerializer())
+				.hashKey(new StringRedisSerializer())
+				.hashValue(configureJackson2JsonRedisSerializer(Match.class))
+				.build();
+
+		return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, serializationContext);
+	}
+
 	public <T> Jackson2JsonRedisSerializer<T> configureJackson2JsonRedisSerializer(Class<T> t) {
 		ObjectMapper objectMapper = new ObjectMapper()
 				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);

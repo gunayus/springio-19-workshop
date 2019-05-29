@@ -155,7 +155,7 @@ and now query again;
 curl -X GET http://localhost:8080/match/1 
 ```
 
-this time you should receive the Math data posted in previous step
+this time you should receive the Match data posted in previous step
 
 In the next section, we will fetch events from Kafka in a reactive manner
  

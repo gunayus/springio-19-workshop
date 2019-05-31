@@ -93,7 +93,7 @@ inject KafkaSender bean in ApiRestService.java
 		}
 
 		final SenderRecord<String, String, Long> senderRecord =
-				SenderRecord.create(new ProducerRecord<>("live-score-topic", matchStr), match.getMatchId());
+				SenderRecord.create(new ProducerRecord<String, String>("live-score-topic", matchStr), match.getMatchId());
 
 
 

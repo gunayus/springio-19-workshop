@@ -4,9 +4,9 @@ This repository contains the source code and the resources for workshop from Spr
 
 https://2019.springio.net/sessions/cloud-native-reactive-spring-boot-application-development-workshop
 
-## 04_reactive_redis step
+## 05_reactive_kafka step
 
-At this step, you are expected to build reactive Redis integration. the repository contains live-score-service module which has teamples of contract files and classes
+At this step, you are expected to build reactive Kafka integration. the repository contains live-score-service module which has teamples of contract files and classes
 
 ### maven dependencies
 

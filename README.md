@@ -10,114 +10,203 @@ At this step, you are expected to build reactive Redis integration. the reposito
 
 ### maven dependencies
 
-in order to fetch data from Redis in a reactive manner, following dependency is needed
+in order to fetch data from Kafka in a reactive manner, following dependencies are needed
 
 ```
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.projectreactor.kafka</groupId>
+			<artifactId>reactor-kafka</artifactId>
 		</dependency>
 ```
 
-### Redis configuration 
+### Kafka configuration 
 
-once we have the maven dependency we have all the required classes. we need Redis configuration beans for following
+we need to create two Spring beans for accessing data from Kafka
+ 
++ KafkaReceiver
++ KafkaSender
 
-+ ReactiveRedisConnectionFactory bean
-+ ReactiveRedisTemplate bean
-
-in the base project, RedisConfig.java is provided. add the following Bean method so that it can be used to perform Redis operations
+in the base project, KafkaConfig.java is provided. add the following Bean methods so that it can be used to perform Kafka operations
 
 ```
 	@Bean
-	public ReactiveRedisTemplate<String, Match> matchReactiveRedisTemplate(ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
-		RedisSerializationContext<String, Match> serializationContext = RedisSerializationContext
-				.<String, Match>newSerializationContext(new StringRedisSerializer())
-				.hashKey(new StringRedisSerializer())
-				.hashValue(configureJackson2JsonRedisSerializer(Match.class))
-				.build();
+	KafkaReceiver kafkaReceiver() {
 
-		return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, serializationContext);
+		Map<String, Object> configProps = new HashMap<>();
+		configProps.put( ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+		configProps.put( ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+		configProps.put( ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+		configProps.put( ConsumerConfig.CLIENT_ID_CONFIG, "live-score-client");
+		configProps.put( ConsumerConfig.GROUP_ID_CONFIG, "live-score-group-id");
+		configProps.put( ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
+ 
+		return new DefaultKafkaReceiver(ConsumerFactory.INSTANCE,
+				ReceiverOptions.create(configProps).subscription(Arrays.asList(topicName))
+		);
 	}
 ```
 
-for creating a ReactiveRedisTemplate bean, you need a connection factory and a serialization context object. Seralization context is created with a hashKey and hashValue seralizer
-
-### fetching data from Redis
-
-in order to fetch data from Redis, we will use the ReactiveRedisTemplate bean that we have added in previous step. 
-
-inject the ReactiveRedisTemplate<String, Match> bean in ApiRestService bean
-
 ```
-@Service
-@RequiredArgsConstructor
-public class ApiRestService {
+	@Bean
+	KafkaSender<String, String> kafkaSender() {
+		Map<String, Object> configProps = new HashMap<>();
+		configProps.put( ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+		configProps.put( ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+		configProps.put( ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+		configProps.put(ProducerConfig.RETRIES_CONFIG, 10);
+		configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+		configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, "163850"); // 163KByte
+		configProps.put(ProducerConfig.LINGER_MS_CONFIG, "100");
+		configProps.put(ProducerConfig.ACKS_CONFIG, "1");
+		configProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "1");
 
-	private final ReactiveRedisTemplate<String, Match> matchReactiveRedisTemplate;
-
-	private ReactiveHashOperations<String, String, Match> matchReactiveHashOperations() {
-		return matchReactiveRedisTemplate.<String, Match>opsForHash();
-	}
-```
-  
-the private method matchReactiveHashOperations() is used to obtain ReactiveHashOperations<String, String, Match> object which will be used for all the Hash opeartions with Redis server. 
-
-implement the findMatchById method in ApiRestService.java
-
-
-```
-	public Mono<Match> findMatchById(Long id) {
-		return matchReactiveHashOperations().get("matches", id.toString());
+		return new DefaultKafkaSender<>(ProducerFactory.INSTANCE,
+				SenderOptions.create(configProps));
 	}
 ```
 
-matchReactiveHashOperations().get() method arguments
+### sending match events to Kafka
 
-+ "matches" : hash name (sort of a hash map)
-+ id.toString() : hash Key 
+in order to send match events to Kafka, we will update ApiRestService.saveMatchDetails method that posts data to Redis and then to Kafka as well
 
-now we can run LiveScoreServiceApplication.java main class to start the application. perform a GET request for any match id
-
-```
-curl -X GET http://localhost:8080/match/1 
-```
-
-all of the above requests should return HTTP-200 but with no content because currently there is no match data with the provided id's in Redis yet
-
-### saving data in Redis
-
-let's assume that we will POST match data through our ApiRestController.java delegating the request to ApiRestService.java bean
+inject KafkaSender bean in ApiRestService.java
 
 ```
-	@PostMapping("/match")
-	public Mono<String> saveMatchDetails(@RequestBody Match match) {
-		return apiRestService.saveMatchDetails(match);
-	}
+	private final KafkaSender<String, String> kafkaSender;
 ```
 
-
-ReactiveHashOperations<String, String, Match> object is used also for saving data in Redis (put operation). add following method in ApiRestService.java class
 
 ```
 	public Mono<String> saveMatchDetails(Match match) {
+		final String matchStr;
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			objectMapper.setPropertyNamingStrategy(new PropertyNamingStrategy.KebabCaseStrategy());
+
+			matchStr = objectMapper.writeValueAsString(match);
+		} catch (Exception ex) {
+			throw new RuntimeException(ex);
+		}
+
+		final SenderRecord<String, String, Long> senderRecord =
+				SenderRecord.create(new ProducerRecord<>("live-score-topic", matchStr), match.getMatchId());
+
+
+
 		return matchReactiveHashOperations().put("matches", match.getMatchId().toString(), match)
+				.then(
+						kafkaSender.send(Mono.just(senderRecord))
+								.next()
+								.doOnNext(longSenderResult -> System.out.println(longSenderResult.recordMetadata()))
+								.map(longSenderResult -> true)
+				)
 				.map(hashOperationResult -> hashOperationResult ? "OK" : "NOK")
 				.onErrorResume(throwable -> Mono.just("EXCEPTION : " + throwable.getMessage()))
 				;
 	}
 ```
+  
+now we have started posting data to Kafka as a new match event is posted to our application
 
-now let's post a Match details 
+
+### consuming match events from Kafka
+
+in order to fetch events from Kafka we will use KafkaReceiver bean that we have configured in previous step 
+
+this calls is provided in the project. KafkaService bean basically receives the events from Kafka as consumerRecords and converts them to ServerSentEvent<String> objects. 
+
+```
+package org.springmeetup.livescoreservice.kafka;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.ConnectableFlux;
+import reactor.kafka.receiver.KafkaReceiver;
+
+import javax.annotation.PostConstruct;
+
+@Service
+@RequiredArgsConstructor
+public class KafkaService {
+
+	private final KafkaReceiver<String,String> kafkaReceiver;
+
+	private ConnectableFlux<ServerSentEvent<String>> eventPublisher;
+
+	@PostConstruct
+	public void init() {
+		eventPublisher = kafkaReceiver.receive()
+				.map(consumerRecord -> ServerSentEvent.builder(consumerRecord.value()).build())
+				.publish();
+
+		// subscribes to the KafkaReceiver -> starts consumption (without observers attached)
+		eventPublisher.connect();
+	}
+
+	public ConnectableFlux<ServerSentEvent<String>> getEventPublisher() {
+		return eventPublisher;
+	}
+
+}
+```
+
+this Spring bean will give us a ConnectableFlux<ServerSentEvent<String>> object that we can use for setting up Server Sent Event connection between clients and our application
+
+inject KafkaService bean in ApiRestController.java
+
+```
+	private final KafkaService kafkaService;
+```
+
+add following method in ApiRestController.java which will provide us the Server Sent Event connection from the client
+
+```
+	@GetMapping(value = "/match/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public Flux<ServerSentEvent<Match>> streamMatchEvents(@PathVariable("id") Long id) {
+		return kafkaService.getEventPublisher()
+				.log()
+				.map(stringServerSentEvent -> {
+
+					ObjectMapper objectMapper = new ObjectMapper();
+					objectMapper.setPropertyNamingStrategy(new PropertyNamingStrategy.KebabCaseStrategy());
+
+					Match match = null;
+					try {
+						match = objectMapper.readValue(stringServerSentEvent.data(), Match.class);
+					} catch (Exception ex) {
+						return null;
+					}
+
+					return ServerSentEvent.<Match>builder()
+							.data(match)
+							.build();
+				})
+				.log()
+				.filter(matchServerSentEvent -> matchServerSentEvent.data().getMatchId().equals(id));
+	}
+```
+
+run the application again, try to initiate the connection
+
+```
+curl -X GET http://localhost:8080/match/20/stream -i
+```
+
+this should start the connection and leave it open, now let's post a match event with match id
 
 ```
 curl -X POST \
   http://localhost:8080/match \
   -H 'Content-Type: application/json' \
   -d '{
-	"match-id": 1,
-	"name": "Barcelona - Getafe",
-	"start-date": "2019-05-01T19:00:00",
+	"match-id": 20,
+	"name": "Dortmund - Getafe",
+	"start-date": "2019-05-29T16:00:00",
 	"status": "COMPLETED",
 	"score": "1 - 2",
 	"events": [
@@ -149,17 +238,11 @@ curl -X POST \
 }'
 ```
 
-and now query again; 
+we should receive this event from the client connection
 
-```
-curl -X GET http://localhost:8080/match/1 
-```
-
-this time you should receive the Match data posted in previous step
-
-In the next section, we will fetch events from Kafka in a reactive manner
+In the next section, we will configure our application from Spring Cloud Config
  
-## next section is 05_reactive_kafka operations
+## next section is 06_cloud_config operations
 
-checkout 05_reactive_kafka branch and follow the instructions in README.md
+checkout 06_cloud_config branch and follow the instructions in README.md
 

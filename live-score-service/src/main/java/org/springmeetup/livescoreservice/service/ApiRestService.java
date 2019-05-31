@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ReactiveHashOperations;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springmeetup.livescoreservice.model.Match;
 import reactor.core.publisher.Mono;
 
@@ -28,4 +27,5 @@ public class ApiRestService {
 				.onErrorResume(throwable -> Mono.just("EXCEPTION : " + throwable.getMessage()))
 				;
 	}
+
 }

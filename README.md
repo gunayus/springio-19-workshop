@@ -6,98 +6,64 @@ https://2019.springio.net/sessions/cloud-native-reactive-spring-boot-application
 
 ## config-service application (the config server)
 
-At this step, you are expected to build spring cloud config service. The live-score-service app receives configuration data from config-service app 
+At this step, you are expected to build spring cloud service registry. All of our services will register themselves on service registry so that router service may discover live-score-service instances and route the requests properly.
+ 
 
-so far we have only worked on live-score-service app. in the scope of this section, a new app config-service is provided. go ahead and import that module
+in the scope of this section, a new app service-registry is provided. go ahead and import that module
 
-it's very easy to have a config-service application. all it takes is following
+it's very easy to have a service-registry application. all it takes is following
 + maven dependency
 + @SpringBootApplication
-+ @EnableConfigServer
-+ config repository git uri
++ @EnableEurekaServer
++ configuration data
 
 ### maven dependencies
-add the following dependency in pom.xml 
+add the following dependency in service-registry/pom.xml 
 
 ```
 	<dependencies>
 	    
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-config-server</artifactId>
+			<artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
 		</dependency>
 
 	    ...
 	    ...
 ```
 
-### @EnableConfigServer
+### @EnableEurekaServer
 
-add the required annotation which is missing to main class ConfigServiceApplication.java so that the config server will be enabled
+add the required annotation which is missing to main class ServiceRegistryApplication.java so that the Eureka server will be enabled
 
 ```
-@EnableConfigServer
+@EnableEurekaServer
 ```
 
 ```
 @SpringBootApplication
-public class ConfigServiceApplication {
+public class ServiceRegistryApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ConfigServiceApplication.class, args);
+		SpringApplication.run(ServiceRegistryApplication.class, args);
 	}
 
 }
 ```
 
-### specify git repository
-spring cloud config server can serve config data from a local git repository or from a remote git server.
+now, it's time to run the service registry from ServiceRegistryApplication.java main class. 
 
-specify the git-uri in config-service application.properties file (located under config-service/src/main/resources/application.properties)
-
-by default the first one is active and refers to my github repository, and the second one refers to an ordinary local git repo directory. make sure that one of them is active. feel free to change with your own settings if any
+verify that service registry is running, go to your browser and open following page
 
 ```
-spring.cloud.config.server.git.uri=https://github.com/gunayus/springio-19-config.git
-#spring.cloud.config.server.git.uri=/Users/egunay/workspaces-springio/config-repo
+http://localhost:8760/
 ```
 
-now, it's time to run the config server from ConfigServiceApplication.java main class. 
+you should see spring Eureka homepage without any application instances
+ 
 
-test the config server 
-
-```
-curl -X GET http://localhost:8888/live-score-service/default
-```
-
-you should get the following response 
-```
-{
-  "name": "live-score-service",
-  "profiles": [
-    "default"
-  ],
-  "label": null,
-  "version": "2190b18e74cb1093bc37dc3a7494218d7759689c",
-  "state": null,
-  "propertySources": [
-    {
-      "name": "https://github.com/gunayus/springio-19-config.git/live-score-service.properties",
-      "source": {
-        "spring.redis.hostname": "localhost",
-        "spring.redis.port": "6379",
-        "spring.redis.password": "password",
-        "kafka.bootstrap.servers": "localhost:9092",
-        "kafka.livescore.topic": "live-score-topic"
-      }
-    }
-  ]
-}
-```
-
-
-## live-score-service application (the config client - consumer)
-as we have the config server up and running it's time to bind the live-score-service application to config server so that hard coded Redis, Kafka configuration data will be retrieved from config server
+## live-score-service application (the service to be registered)
+as we have the service registry up and running it's time to register the live-score-service application to service registry so that the instances of our service can be discovered by other micro services
 
 add the following dependecy in live-score-service/pom.xml
 
@@ -106,48 +72,34 @@ add the following dependecy in live-score-service/pom.xml
 	    
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-config</artifactId>
+			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
 
 	    ...
 	    ...
 ```
 
-specify config server location in live-score-service/src/main/resources/application.properties
+specify service registry location in live-score-service/src/main/resources/application.properties
 
 ```
-spring.cloud.config.uri=http://localhost:8888
+eureka.client.service-url.defaultZone=http://localhost:8760/eureka/
 ```
 
 
-finally replace the hard coded Redis & Kafka configuration classes so that the configuration parameters are loaded from config server
+run live-score-service application LiveScoreServiceApplication.java
 
-live-score-service/src/main/java/org/springmeetup/livescoreservice/redis/RedisConfiguration.java
+go to spring Eureka dashboard again, 
+
 ```
-	@Value("${spring.redis.hostname}")
-	String hostname;
-
-	@Value("${spring.redis.port}")
-	Integer port;
-
-	@Value("${spring.redis.password}")
-	String password;
+http://localhost:8760/
 ```
 
-live-score-service/src/main/java/org/springmeetup/livescoreservice/kafka/KafkaConfiguration.java
-```
-	@Value("${kafka.bootstrap.servers}")
-	String bootstrapServers;
+you should see one instance of LIVE-SCORE-SERVICE in dashboard
 
-	@Value("${kafka.livescore.topic}")
-	String topicName;
-```
-
-live-score-service application should be running smootly just like at the end of previous section. 
 
 In the next section, we will register our application in Netflix Eureka Server
  
-## next section is 07_service_registry operations
+## next section is 08_gateway_service operations
 
-checkout 07_service_registry branch and follow the instructions in README.md
+checkout 08_gateway_service branch and follow the instructions in README.md
 

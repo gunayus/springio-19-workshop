@@ -23,9 +23,11 @@ import java.util.Map;
 @Configuration
 public class KafkaConfiguration {
 
-	String bootstrapServers = "localhost:9092";
+	@Value("${kafka.bootstrap.servers}")
+	String bootstrapServers;
 
-	String topicName = "live-score-topic";
+	@Value("${kafka.livescore.topic}")
+	String topicName;
 
 	@Bean
 	KafkaReceiver kafkaReceiver() {

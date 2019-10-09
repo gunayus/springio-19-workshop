@@ -3,6 +3,7 @@ package org.springmeetup.livescoreservice.redis;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
@@ -17,11 +18,14 @@ import org.springmeetup.livescoreservice.model.Match;
 @Configuration
 public class RedisConfiguration {
 
-	String hostname = "localhost";
+	@Value("${spring.redis.hostname}")
+	String hostname;
 
-	Integer port = 6379;
+	@Value("${spring.redis.port}")
+	Integer port;
 
-	String password = "password";
+	@Value("${spring.redis.password}")
+	String password;
 
 
 	@Bean

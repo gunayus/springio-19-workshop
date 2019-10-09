@@ -147,7 +147,7 @@ live-score-service application should be running smootly just like at the end of
 
 In the next section, we will register our application in Netflix Eureka Server
  
-## next section is 07_cloud_service_registry operations
+## next section is 07_service_registry operations
 
-checkout 07_cloud_service_registry branch and follow the instructions in README.md
+checkout 07_service_registry branch and follow the instructions in README.md
 

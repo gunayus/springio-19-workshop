@@ -97,7 +97,53 @@ you should get the following response
 
 
 ## live-score-service application (the config client - consumer)
-as we have the config server up and running it's time to bind the live-score-service application 
+as we have the config server up and running it's time to bind the live-score-service application to config server so that hard coded Redis, Kafka configuration data will be retrieved from config server
+
+add the following dependecy in live-score-service/pom.xml
+
+```
+	<dependencies>
+	    
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+
+	    ...
+	    ...
+```
+
+specify config server location in live-score-service/src/main/resources/application.properties
+
+```
+spring.cloud.config.uri=http://localhost:8888
+```
+
+
+finally replace the hard coded Redis & Kafka configuration classes so that the configuration parameters are loaded from config server
+
+live-score-service/src/main/java/org/springmeetup/livescoreservice/redis/RedisConfiguration.java
+```
+	@Value("${spring.redis.hostname}")
+	String hostname;
+
+	@Value("${spring.redis.port}")
+	Integer port;
+
+	@Value("${spring.redis.password}")
+	String password;
+```
+
+live-score-service/src/main/java/org/springmeetup/livescoreservice/kafka/KafkaConfiguration.java
+```
+	@Value("${kafka.bootstrap.servers}")
+	String bootstrapServers;
+
+	@Value("${kafka.livescore.topic}")
+	String topicName;
+```
+
+live-score-service application should be running smootly just like at the end of previous section. 
 
 In the next section, we will register our application in Netflix Eureka Server
  

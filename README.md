@@ -17,6 +17,7 @@ The workshop material is designed and provided in consequent git branches. at ea
 + 06_cloud_config
 + 07_service_registry
 + 08_gateway_service
++ 09_complete
 
 
 

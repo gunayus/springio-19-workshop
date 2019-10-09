@@ -4,102 +4,113 @@ This repository contains the source code and the resources for workshop from Spr
 
 https://2019.springio.net/sessions/cloud-native-reactive-spring-boot-application-development-workshop
 
-## config-service application (the config server)
+At this final step, you are expected to build gateway service. Gateway service will be responsible for routing the requests coming from clients to either team-service, or live-score-service.
 
-At this step, you are expected to build spring cloud service registry. All of our services will register themselves on service registry so that router service may discover live-score-service instances and route the requests properly.
- 
+in the scope of this section, two new apps are provided 'team-service' and 'gateway-service'. go ahead and import those modules
 
-in the scope of this section, a new app service-registry is provided. go ahead and import that module
+## team-service application 
 
-it's very easy to have a service-registry application. all it takes is following
+this application has nothing special, but providing a simple Rest service which will return team information from just in memory data.
+
+it has all the required dependencies and configuration data so that just like live-score-service, it will register itself in service-registry. 
+
+go ahead, run the app TeamServiceApplication.java 
+
+verify that it works 
+
+```
+curl -X GET http://localhost:8081/team/Fenerbahce
+```
+
+should return 
+
+```
+{
+  "name": "Fenerbahçe",
+  "coach": "Ersun Yanal",
+  "city": "İstanbul",
+  "stadium": "Şükrü Saracoğlu",
+  "establishedYear": 1907
+}
+```
+
+## gateway-service application 
+
+it's very easy to have a gateway-service application. all it takes is following
+
 + maven dependency
 + @SpringBootApplication
-+ @EnableEurekaServer
++ @EnableZuulProxy
 + configuration data
 
 ### maven dependencies
-add the following dependency in service-registry/pom.xml 
+add the following dependency in gateway-service/pom.xml 
 
 ```
 	<dependencies>
 	    
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+			<artifactId>spring-cloud-starter-netflix-zuul</artifactId>
 		</dependency>
 
 	    ...
 	    ...
 ```
 
-### @EnableEurekaServer
+### @EnableZuulProxy
 
-add the required annotation which is missing to main class ServiceRegistryApplication.java so that the Eureka server will be enabled
+add the required annotation which is missing to main class GatewayServiceApplication.java so that the Zuul proxy will be enabled
 
 ```
-@EnableEurekaServer
+@EnableZuulProxy
 ```
 
 ```
 @SpringBootApplication
-public class ServiceRegistryApplication {
+public class GatewayServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ServiceRegistryApplication.class, args);
+		SpringApplication.run(GatewayServiceApplication.class, args);
 	}
 
 }
 ```
 
-now, it's time to run the service registry from ServiceRegistryApplication.java main class. 
+### routing configuration
 
-verify that service registry is running, go to your browser and open following page
+specify routing rules in gateway-service/src/main/resources/application.properties. following configuration declares two different routes
+
++ route to team-service
++ route to live-score-service
+
+pay attention to serviceId's, which should be identical to service names (spring.application.name)
 
 ```
-http://localhost:8760/
+zuul.routes.team.path=/team-service
+zuul.routes.team.serviceId=team-service
+
+zuul.routes.livescore.path=/live-score-service
+zuul.routes.livescore.serviceId=live-score-service
 ```
 
-you should see spring Eureka homepage without any application instances
+make sure that all of the other services are running. if not, start them in the following order 
++ config-service
++ service-registry
++ team-service
++ live-score-service
+
+now, it's time to run the gateway service from GatewayServiceApplication.java main class. 
+
+
+verify that gateway service is running, and it routes the requests properly to dedicated micro service
+
+```
+curl -X GET http://localhost:8000/live-score-service/match/1
+curl -X GET http://localhost:8000/team-service/team/Fenerbahce
+```
+
+you should see expected responses from live-score-service & team-service correspondinly
  
 
-## live-score-service application (the service to be registered)
-as we have the service registry up and running it's time to register the live-score-service application to service registry so that the instances of our service can be discovered by other micro services
-
-add the following dependecy in live-score-service/pom.xml
-
-```
-	<dependencies>
-	    
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-		</dependency>
-
-	    ...
-	    ...
-```
-
-specify service registry location in live-score-service/src/main/resources/application.properties
-
-```
-eureka.client.service-url.defaultZone=http://localhost:8760/eureka/
-```
-
-
-run live-score-service application LiveScoreServiceApplication.java
-
-go to spring Eureka dashboard again, 
-
-```
-http://localhost:8760/
-```
-
-you should see one instance of LIVE-SCORE-SERVICE in dashboard
-
-
-In the next section, we will register our application in Netflix Eureka Server
- 
-## next section is 08_gateway_service operations
-
-checkout 08_gateway_service branch and follow the instructions in README.md
 
